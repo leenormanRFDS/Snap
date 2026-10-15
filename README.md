@@ -1,2 +1,1 @@
-# Snap
-Snap cal
+Deploy the index.html as a static website on Vercel. Test using the live HTTPS address in Safari, not an iOS Files/Quick Look preview. There are no build dependencies.

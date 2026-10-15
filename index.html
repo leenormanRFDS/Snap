@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<meta name="theme-color" content="#0c1824" />
+<title>Native Scroll Calibration · Scroll Lab v4</title>
+<style>
+:root {color-scheme:dark;--ink:#0d1722;--panel:#172637;--accent:#b9e7d8;--txt:#e7f2f0;--muted:#a9bbc3;--line:#39505c;--orange:#f7ae76}
+*{box-sizing:border-box}body{margin:0;background:var(--ink);color:var(--txt);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}button{font:inherit;cursor:pointer}
+header{display:flex;justify-content:space-between;align-items:center;max-width:1130px;margin:0 auto;padding:22px 22px;border-bottom:1px solid #35454e}
+.brand{font-weight:800;letter-spacing:.13em;font-size:13px}.brand span{color:var(--accent)}.build{font-size:11px;letter-spacing:.11em;color:#9fb1bc}
+main{max-width:1130px;margin:auto;display:grid;grid-template-columns:minmax(270px, 0.86fr) minmax(360px, 1.14fr);gap:34px;padding:30px 22px 60px}
+h1{font-size:clamp(34px,4vw,58px);letter-spacing:-.05em;line-height:1.06;margin:14px 0 15px;font-weight:730}
+.eyebrow{font-size:11px;color:var(--accent);text-transform:uppercase;letter-spacing:.17em;font-weight:800}p{color:#b8c8cb}
+.instructions{font-size:15px;margin:0 0 20px}.card{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:18px;margin-top:14px}
+.card small{color:#b6cbce;letter-spacing:.1em;font-size:10px;font-weight:800;text-transform:uppercase}.card strong{display:block;font-size:25px;font-weight:750;line-height:1.3;letter-spacing:-.025em;margin-top:5px}
+.dots{display:flex;gap:9px;margin:12px 0}.dot{width:48px;height:7px;border-radius:10px;background:#465b62}.dot.on{background:var(--accent)}
+.buttons{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0}button{background:var(--accent);border:0;border-radius:100px;padding:12px 16px;font-size:13px;color:#103126;font-weight:800}button.secondary{border:1px solid #68818b;color:#effaf9;background:transparent}button:disabled{opacity:.5;cursor:not-allowed}button:focus-visible{outline:3px solid var(--orange);outline-offset:2px}
+.note{font-size:12px;color:#a2b6ba;margin-top:20px}.signal{padding:11px 12px;border-radius:10px;background:#102d32;border:1px solid #39746d;font-size:12px;color:#c8efdf;margin-top:15px}.signal.fail{background:#3b2722;border-color:#c37162;color:#ffcab7}
+.visual-column{min-width:0}.frame{border:1px solid #455661;border-radius:24px;overflow:hidden;position:relative;background:#263645;box-shadow:0 28px 75px #0005}
+/* Crucial difference from v3: this is a real native scrolling region.
+   Do NOT cancel touch defaults, use pointer capture or set touch-action:none. */
+.scroll-pad{height:min(69svh,650px);min-height:400px;overflow-x:hidden;overflow-y:scroll;-webkit-overflow-scrolling:touch;overscroll-behavior-y:contain;touch-action:pan-y;scroll-behavior:auto;position:relative;scrollbar-width:thin;scrollbar-color:#5d7b81 transparent}
+.rail{height:6200px;position:relative}.scene{position:sticky;top:0;height:min(69svh,650px);min-height:400px;overflow:hidden;background:radial-gradient(ellipse at 48% 37%,#364b5c 0%,#223242 58%,#152734 100%);pointer-events:none;user-select:none}
+.scene:before{position:absolute;inset:0;content:"";background-image:linear-gradient(#b5d9df13 1px,transparent 1px),linear-gradient(90deg,#b5d9df13 1px,transparent 1px);background-size:48px 48px;mask-image:linear-gradient(to bottom,transparent 5%,#000a 35%,#0008 90%)}
+.stage-top,.stage-bottom{position:absolute;left:23px;right:23px;z-index:3;display:flex;justify-content:space-between;gap:8px;align-items:center}.stage-top{top:20px}.stage-bottom{bottom:21px}.corner{font-size:11px;letter-spacing:.1em;font-weight:800}.pill{border:1px solid #a8c4be50;background:#132732a6;border-radius:50px;padding:6px 10px;font-size:11px;color:#d0f2e7;font-weight:800}.stage-bottom span{font-size:12px;color:#d9e5e7}
+.model{position:absolute;inset:5% 0 0;width:100%;height:91%;opacity:0;transition:opacity .25s;display:block}.model svg{width:100%;height:100%;display:block;overflow:visible}body.demo .model{opacity:1}.model-group{transform-box:view-box;transform-origin:0 0;transition:transform .09s linear}
+.cal-visual{position:absolute;left:50%;top:48%;transform:translate(-50%,-50%);text-align:center;display:grid;justify-items:center;gap:13px;transition:transform .12s}.cal-visual .tile{width:110px;height:110px;background:linear-gradient(145deg,#e1f8df,#96d3bf);border-radius:25px;display:grid;place-items:center;box-shadow:0 14px 37px #071920aa;color:#17352e;font-size:53px}.cal-visual strong{font-size:19px;white-space:nowrap}.cal-visual p{margin:0;font-size:12px;max-width:250px;color:#e3f0e9}body.demo .cal-visual{display:none}
+#revealHeadline{position:absolute;top:78px;left:23px;z-index:3;font-size:12px;letter-spacing:.1em;color:#d5efe4;text-transform:uppercase;display:none}body.demo #revealHeadline{display:block}
+#beatTitle{position:absolute;left:23px;bottom:83px;z-index:3;font-size:23px;font-weight:800;display:none}body.demo #beatTitle{display:block}
+#floatingStart{position:absolute;z-index:5;bottom:75px;left:50%;transform:translateX(-50%);width:max-content;display:none;box-shadow:0 12px 30px #0006}body.ready #floatingStart{display:block}
+.demo-tools{margin-top:14px;padding:15px;border:1px solid var(--line);border-radius:15px;background:#172637}.demo-tools[hidden]{display:none}.row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}.seg{display:flex;gap:4px}.seg button{padding:7px 12px;background:#2a4050;color:#d1e1e2}.seg button.active{background:var(--accent);color:#123328}.stat{font-size:12px;color:#bed1d1;margin-top:12px}.track{height:8px;background:#334e5a;border-radius:20px;overflow:hidden;margin-top:11px}.track > div{width:0;height:100%;background:var(--accent);transition:width .06s}
+footer{max-width:1130px;margin:auto;padding:0 22px 30px;color:#8b9eab;font-size:11px}
+@media(max-width:900px){main{grid-template-columns:1fr;max-width:680px;gap:15px;padding-top:24px}.visual-column{grid-row:2}.info{display:contents}h1{margin:12px 0 6px}.instructions{margin:0}.card,.buttons,.note,.signal{grid-row:auto}.card{margin-top:8px}.scroll-pad,.scene{height:clamp(400px,55svh,530px)}.visual-column{margin-top:8px}}
+@media(max-width:520px){header{padding:14px 16px}.build{display:none}main{padding:20px 14px 55px;gap:13px}h1{font-size:37px}.instructions{font-size:13px}.scroll-pad,.scene{height:clamp(380px,54svh,500px);min-height:380px}.frame{border-radius:18px}.card{padding:14px}.scene .stage-top,.scene .stage-bottom{left:16px;right:16px}.stage-top{top:14px}.stage-bottom{bottom:15px}#beatTitle{left:16px}#revealHeadline{left:16px}}
+@media(prefers-reduced-motion:reduce){.model,.model-group{transition:none}}
+</style></head>
+<body>
+<header><div class="brand">↕ <span>SCROLL</span> / LAB</div><div class="build">V4 · NATIVE MOBILE SCROLL</div></header>
+<main>
+<section class="info">
+<div><div class="eyebrow" id="step">Step 01 / 02 · Calibrate</div><h1 id="headline">Your scroll. Your pace.</h1><p id="intro" class="instructions">Swipe up <b>three times inside the building window</b>, exactly as you normally scroll a page. The window itself really scrolls, including momentum.</p></div>
+<div class="card"><small id="cardTitle">Live calibration</small><div class="dots" id="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div><strong id="primaryMetric">0 / 3 swipes recorded</strong><p id="metricDescription" style="font-size:13px;margin:5px 0 0">Gesture distance includes natural browser scrolling and momentum.</p></div>
+<div class="buttons"><button id="start" disabled>Start personalised reveal →</button><button id="reset" class="secondary">Calibrate again</button><button id="skip" class="secondary">Skip calibration</button></div>
+<div id="signal" class="signal fail" role="status">JavaScript hasn't started. If this message stays here, this preview cannot run interactive websites. Open the deployed HTTPS page in Safari.</div>
+<p class="note">This measures actual scrolling in a native scroll container—not finger dragging. Processing stays on your device. Calibration is stored locally when the browser permits it.</p>
+</section>
+<section class="visual-column">
+<div class="frame">
+<div class="scroll-pad" id="scrollPad" aria-label="Native scroll test area. Swipe up three times to calibrate. Then scroll to reveal the building." tabindex="0">
+<div class="rail"><div class="scene" id="scene">
+<div class="stage-top"><span class="corner" id="stageLabel">CALIBRATION · SWIPE UP</span><span class="pill" id="stageCounter">0 / 3</span></div>
+<div class="cal-visual" id="calVisual"><div class="tile">⌃</div><strong>Push the building up</strong><p>Use your usual phone swipe. Native scrolling is ON.</p></div>
+<div class="model"><svg viewBox="0 0 720 570" aria-hidden="true">
+<defs><linearGradient id="leftWall" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#a0b7b3"/><stop offset="1" stop-color="#4c6f76"/></linearGradient><linearGradient id="rightWall" x1="0" x2=".4" y1="0" y2="1"><stop stop-color="#61868c"/><stop offset="1" stop-color="#274957"/></linearGradient><linearGradient id="topPanel" x1=".2" x2=".9" y1="0" y2="1"><stop stop-color="#e6ede1"/><stop offset="1" stop-color="#a8c8bd"/></linearGradient><linearGradient id="roofPanel" x1="0" x2="1" y1="0" y2="1"><stop stop-color="#f4d1b0"/><stop offset="1" stop-color="#c99874"/></linearGradient></defs>
+<ellipse cx="366" cy="489" rx="237" ry="50" fill="#041a22" opacity=".36"/>
+<path d="M110 500 359 385 617 501 366 560Z" fill="none" stroke="#9abfb6" opacity=".16" stroke-width="1.6" stroke-dasharray="5 9"/>
+<g id="model" transform="translate(0,-5)">
+<!-- Concrete podium -->
+<g id="foundation" class="model-group">
+<polygon points="175,374 356,296 544,374 363,456" fill="#e1d3b7"/>
+<polygon points="175,374 363,456 363,479 175,395" fill="#978d82"/>
+<polygon points="363,456 544,374 544,395 363,479" fill="#777f7a"/>
+<path d="M205 387 356 322 516 389M250 409 405 343M297 433 453 365" fill="none" stroke="#d8b991" stroke-width="2" opacity=".65"/>
+</g>
+<!-- Ground-floor health care block -->
+<g id="groundFloor" class="model-group">
+<polygon points="175,329 355,253 544,329 364,411" fill="url(#topPanel)" stroke="#dceee0" stroke-width="1"/>
+<polygon points="175,329 364,411 364,451 175,369" fill="url(#leftWall)"/>
+<polygon points="364,411 544,329 544,369 364,451" fill="url(#rightWall)"/>
+<path d="M213 348 213 382 250 398 250 365M273 373 273 408 310 423 310 389M390 403 390 435 433 416 433 383M459 374 459 402 500 382 500 357" stroke="#d9e5da" opacity=".8" stroke-width="2" fill="none"/>
+<path d="M266 291 454 367M355 253 355 410M261 365 446 282" fill="none" stroke="#638f87" stroke-width="4" opacity=".85"/>
+
+</g>
+<!-- First-floor education block -->
+<g id="upperFloor" class="model-group">
+<polygon points="175,276 355,200 544,276 364,358" fill="#bad9d1" stroke="#deeee2" stroke-width="1"/>
+<polygon points="175,276 364,358 364,397 175,315" fill="#5b8589"/>
+<polygon points="364,358 544,276 544,315 364,397" fill="#385d68"/>
+<path d="M211 303 211 327 248 344 248 319M274 330 274 356 312 372 312 347M400 345 400 372 443 351 443 327M469 313 469 342 506 323 506 298" fill="none" stroke="#d8e8dc" opacity=".9" stroke-width="2"/>
+<path d="M355 200 355 357M264 238 453 313M264 313 451 236" stroke="#5f8d83" opacity=".85" stroke-width="4"/>
+</g>
+<!-- Roof -->
+<g id="roof" class="model-group"><polygon points="168,231 355,149 551,231 364,320" fill="url(#roofPanel)" stroke="#f8e1c7" stroke-width="1.5"/><polygon points="168,231 364,320 364,333 168,244" fill="#ba8a69"/><polygon points="364,320 551,231 551,244 364,333" fill="#956e59"/><path d="M226 249 355 193 491 248M285 277 416 219" stroke="#fff0de" stroke-opacity=".43" stroke-width="2" fill="none"/></g>
+</g>
+<g class="demo-only" fill="none" stroke="#b8e4d7" stroke-width="1.6" opacity=".72" stroke-dasharray="3 6"><path d="M100 376H208"/><path d="M503 258h109"/></g>
+</svg></div>
+<div id="revealHeadline">LIVE ARCHITECTURAL REVEAL</div><div id="beatTitle">Whole building</div>
+<div class="stage-bottom"><span id="stageHelp">Swipe anywhere inside this panel</span><span class="pill" id="scrollReadout">0 px</span></div>
+</div></div>
+</div>
+<button id="floatingStart">Explore my calibrated reveal →</button>
+</div>
+<div class="demo-tools" id="demoTools" hidden>
+<div class="row"><span class="eyebrow">Sensitivity comparison</span><div class="seg"><button id="personal" class="active">Personalised</button><button id="standard">Default</button></div></div>
+<div class="stat" id="mappingStat">Swipe to start exploring</div><div class="track"><div id="trackBar"></div></div>
+<div class="row" style="margin-top:13px"><button class="secondary" id="restartReveal">Reset reveal</button><button class="secondary" id="recalibrate">New calibration</button></div>
+</div>
+</section></main>
+<footer>For an actual iPhone test, serve this page over HTTPS. Apple's Files / Quick Look HTML preview may show the design without running its JavaScript.</footer>
+<script>
+(() => { 'use strict';
+const $=id=>document.getElementById(id), pad=$('scrollPad'), KEY='scroll_lab_native_v4';
+const baseBeat=320, beatCount=4, quietMs=310;
+let phase='calibration', samples=[], session=null, stopTimer=null, calibration=null, mode='personal', progress=0;
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const median=a=>[...a].sort((x,y)=>x-y)[Math.floor(a.length/2)];
+const now=()=>performance.now();
+const scrolling=()=>Math.max(0,pad.scrollTop);
+function signal(msg,good=true){$('signal').textContent=msg;$('signal').classList.toggle('fail',!good)}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(calibration))}catch(e){}}
+function read(){try{const x=JSON.parse(localStorage.getItem(KEY));if(x&&x.version===4&&Number.isFinite(x.distance)&&x.distance>50&&x.distance<4000){calibration=x}}catch(e){}}
+function distancePerBeat(){return mode==='personal'&&calibration?calibration.distance:baseBeat}
+function stageUpdate(){
+ const pixel=scrolling();$('scrollReadout').textContent=`${Math.round(pixel)} px`;
+ if(phase==='demo'){
+  progress=clamp(pixel/(distancePerBeat()*beatCount),0,1);
+  const ease=t=>{const v=clamp(t,0,1);return v*v*(3-2*v)};
+  $('roof').style.transform=`translateY(${-160*ease(progress/.28)}px)`;
+  $('upperFloor').style.transform=`translateY(${-95*ease((progress-.19)/.34)}px)`;
+  $('groundFloor').style.transform=`translateY(${50*ease((progress-.48)/.32)}px)`;
+  $('foundation').style.transform=`translateY(${65*ease((progress-.7)/.30)}px)`;
+  const names=['Whole building','Roof separates','Education level','Healthcare level','Fully revealed'];
+  $('beatTitle').textContent=names[clamp(Math.floor(progress*5),0,4)];
+  $('stageCounter').textContent=`${Math.round(progress*100)}%`;
+  $('trackBar').style.width=`${progress*100}%`;
+  $('mappingStat').textContent=`${mode==='personal'&&calibration?'Personalised':'Default'} • ${Math.round(distancePerBeat())} scroll px per reveal beat • ${Math.round(pixel)}px travelled • ${Math.round(progress*100)}% revealed`;
+ } else if(phase==='calibration'&&session){
+  $('scrollReadout').textContent=`+${Math.round(Math.max(0,pixel-session.start))} px`;
+ }
+}
+function displayCal(){
+ $('dots').querySelectorAll('.dot').forEach((el,i)=>el.classList.toggle('on',i<samples.length));
+ $('primaryMetric').textContent=`${samples.length} / 3 swipes recorded`;
+ $('stageCounter').textContent=`${samples.length} / 3`;
+ $('metricDescription').textContent=samples.length?`Native distances: ${samples.map(x=>x.distance+' px').join(' · ')}`:'Gesture distance includes natural browser scrolling and momentum.';
+}
+function finishSession(){
+ if(stopTimer){clearTimeout(stopTimer);stopTimer=null}
+ if(!session)return;
+ const s=session;session=null;
+ if(phase!=='calibration')return;
+ const distance=Math.round(Math.max(0,scrolling()-s.start,s.wheelDistance||0));
+ if(distance<25){signal('Too little native scroll detected. Swipe farther up inside the window.');return}
+ samples.push({distance,ms:Math.round(now()-s.started),input:s.input});
+ displayCal();
+ if(samples.length===3){
+  const typical=median(samples.map(x=>x.distance));
+  calibration={version:4,distance:clamp(typical,60,1600),samples:[...samples]};
+  save();phase='ready';document.body.classList.add('ready');$('start').disabled=false;
+  $('primaryMetric').textContent=`${Math.round(calibration.distance)} px / natural swipe`;
+  $('metricDescription').textContent=`Measured scroll: ${samples.map(x=>x.distance).join(' / ')} px. Median becomes one building reveal beat.`;
+  $('stageLabel').textContent='CALIBRATION COMPLETE';$('stageCounter').textContent='3 / 3';
+  signal('Three native scrolling gestures captured. Tap Start to apply your personal sensitivity.');
+ }else signal(`Swipe ${samples.length} recorded (${distance}px). ${3-samples.length} more to go.`);
+}
+function scheduleFinish(ms=quietMs){if(stopTimer)clearTimeout(stopTimer);stopTimer=setTimeout(finishSession,ms)}
+function newSession(input){
+ if(phase!=='calibration')return;
+ if(session)finishSession();
+ if(phase!=='calibration')return;
+ session={input,start:scrolling(),started:now(),ended:false,wheelDistance:0};
+}
+pad.addEventListener('touchstart',()=>{if(phase!=='calibration')return;newSession('touch')},{passive:true});
+pad.addEventListener('touchend',()=>{if(phase==='calibration'&&session){session.ended=true;scheduleFinish(quietMs)}},{passive:true});
+pad.addEventListener('touchcancel',()=>{if(session)scheduleFinish(quietMs)},{passive:true});
+pad.addEventListener('wheel',(e)=>{
+ if(phase!=='calibration')return;
+ if(!session)newSession('wheel');
+ if(session && session.input==='wheel') session.wheelDistance += Math.max(0,e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?pad.clientHeight:1));
+ // A trackpad/wheel burst ends when wheel events fall quiet. No preventDefault.
+ scheduleFinish(quietMs);
+},{passive:true});
+pad.addEventListener('scroll',()=>{
+ stageUpdate();
+ if(phase==='calibration'&&session&&(session.ended||session.input==='wheel'))scheduleFinish(quietMs);
+},{passive:true});
+function beginDemo(withCalibration){
+ if(session)finishSession();
+ if(!withCalibration)calibration=null;
+ phase='demo';mode=calibration?'personal':'default';document.body.classList.remove('ready');document.body.classList.add('demo');
+ $('demoTools').hidden=false;$('step').textContent='Step 02 / 02 · Architectural reveal';
+ $('headline').textContent='Now, scroll the building apart.';
+ $('intro').innerHTML='Scroll <b>inside the building window</b> again. This is genuine native browser scrolling, mapped to the model reveal. Reverse direction to rebuild it.';
+ $('stageLabel').textContent='ARCHITECTURAL REVEAL';$('stageHelp').textContent='Swipe up to separate · down to rebuild';
+ $('cardTitle').textContent='Active scroll mapping';
+ $('dots').hidden=true;
+ $('primaryMetric').textContent=`${Math.round(distancePerBeat())} px / reveal beat`;
+ $('metricDescription').textContent=calibration?'Your three natural swipes define animation sensitivity.':'Baseline reveal sensitivity, without calibration.';
+ $('start').hidden=true;$('skip').hidden=true;$('floatingStart').hidden=true;
+ $('personal').disabled=!calibration;updateMode();
+ pad.scrollTop=0;stageUpdate();
+ signal(calibration?'Personal calibration applied. Compare the same physical swipe using Default.':'Default mode. Recalibrate to personalise the reveal.');
+}
+function updateMode(){
+ $('personal').classList.toggle('active',mode==='personal');$('standard').classList.toggle('active',mode==='default');
+ $('primaryMetric').textContent=`${Math.round(distancePerBeat())} px / reveal beat`;
+ $('metricDescription').textContent=mode==='personal'&&calibration?'Derived from the median of your three native swipes.':'Fixed 320 px baseline for comparison.';
+ stageUpdate();
+}
+function reset(){
+ if(stopTimer)clearTimeout(stopTimer);stopTimer=null;session=null;samples=[];calibration=null;mode='personal';progress=0;phase='calibration';
+ try{localStorage.removeItem(KEY)}catch(e){}
+ document.body.classList.remove('demo','ready');$('demoTools').hidden=true;$('start').disabled=true;$('start').hidden=false;$('skip').hidden=false;
+ $('dots').hidden=false;$('floatingStart').hidden=true;
+ $('step').textContent='Step 01 / 02 · Calibrate';$('headline').textContent='Your scroll. Your pace.';
+ $('intro').innerHTML='Swipe up <b>three times inside the building window</b>, exactly as you normally scroll a page. The window itself really scrolls, including momentum.';
+ $('cardTitle').textContent='Live calibration';$('stageLabel').textContent='CALIBRATION · SWIPE UP';$('stageHelp').textContent='Swipe anywhere inside this panel';
+ pad.scrollTop=0;displayCal();stageUpdate();signal('JavaScript is active. Swipe up naturally inside the panel. Live scroll pixels will change.');
+}
+$('start').addEventListener('click',()=>beginDemo(true));
+$('floatingStart').addEventListener('click',()=>beginDemo(true));
+$('skip').addEventListener('click',()=>beginDemo(false));
+$('reset').addEventListener('click',reset);
+$('recalibrate').addEventListener('click',reset);
+$('restartReveal').addEventListener('click',()=>{pad.scrollTop=0;stageUpdate()});
+$('personal').addEventListener('click',()=>{if(!calibration)return;mode='personal';updateMode()});
+$('standard').addEventListener('click',()=>{mode='default';updateMode()});
+read();
+if(calibration){
+ phase='ready';document.body.classList.add('ready');$('start').disabled=false;
+ $('stageLabel').textContent='PREVIOUS CALIBRATION READY';$('stageCounter').textContent='SAVED';
+ $('primaryMetric').textContent=`${Math.round(calibration.distance)} px / natural swipe`;
+ $('metricDescription').textContent='Saved from a previous three-swipe native scroll test. You can use this or calibrate again.';
+ signal('Saved calibration loaded. Select Start or Calibrate again.');
+}else{reset();}
+window.scrollLabState=()=>({phase,samples:[...samples],calibration,mode,progress:Math.round(progress*100),nativeScroll:Math.round(scrolling()),perBeat:Math.round(distancePerBeat())});
+})();
+</script></body></html>
